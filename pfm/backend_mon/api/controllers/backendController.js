@@ -18,7 +18,7 @@ exports.updateDb = function(req, res) {
   var request = require('request');
   var options = {
     'method': 'GET',
-    'url': 'http://api.coinlayer.com/live?access_key=***REMOVED***&symbols=XDN,DCR,CVC,XLM, MIOTA,BCN,PTOY,ETH,BTH,XRP,LTC,NEO&target=EUR',
+    'url': 'http://api.coinlayer.com/live?access_key=***REMOVED***&target=EUR',
     'headers': {
     }
   };
