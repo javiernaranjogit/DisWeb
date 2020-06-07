@@ -31,16 +31,16 @@
         <meta name="format-detection" content="telephone=no">
         <meta name="msapplication-tap-highlight" content="no">
         <meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
-        <link rel="stylesheet" type="text/css" href="css/index.css">
-        <title>Index</title>
-        <script>
-              var nombre_usuario = window.localStorage.getItem('userName');
-              document.getElementById("nombre_usuario").innerHTML = "<b>" + nombre_usuario + "</b>"
-            </script>
+        <link rel="stylesheet" type="text/css" href="../css/index.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+        <title>Calculadora de divisas</title>
+        <script src="../lib/Chart.js/dist/Chart.min.js"></script>
+       
+
     </head>
     <body>
         <div class="app">
-            <h1>Criptodivisas</h1>
+            <h1>Divisas</h1>
                 <div id="header">
                     <ul class="nav">
                         <li><a href="dashboard.html">Inicio</a></li>
@@ -48,17 +48,40 @@
                         <li><a href="cartera.html">Mi cartera</a></li>
                         <li><a href="calculadora_registrado.html">Conversor</a></li>
                         <li><a href="biblioteca.html">Biblioteca</a></li>
-                        <li><a href="index.html">Salir</a></li>
+                        <li><a href="../index.html">Salir</a></li>
+
                     </ul> 
                 </div>
-                
-                <div id="content">
-                    <b>Bienvenido a la parte privada <div id="nombre_usuario"></div></b>
-                    <div id="cotizaciones"></div>
+                <div id="subheader">
+                    <ul class="nav">
+                        <li><a href="nueva_divisa_cartera.html">Añadir nueva criptodivisas a cartera</a></li>
+                    </ul> 
                 </div>
-
+                <div id="nuevo_registro_cartera">
+                    <p><b>Añada su moneda nueva así como su cantidad</b></p>
+                    <form id="nuevo_registro" method="post">  
+                        <label for="nombre_divisa">Nueva Divisa:</label>
+                        <select id="origen" name="origen">
+                            <option value="ETH">Ethereum</option> 
+                            <option value="XRP">Ripple</option>
+                            <option value="BTC"selected>Bitcoin</option>
+                            <option value="EOS">EOS</option> 
+                            <option value="XLM">Lúmenes estelares</option>
+                            <option value="LTC">Litecoin</option>
+                            <option value="USDT">Tether</option>
+                            <option value="ADA">Cardanos</option>
+                            <option value="XMR">Monero</option>
+                          </select> 
+                        <label for="cantidad">Cantidad:</label>
+                        <input id="cantidad" name="cantidad" type="number">
+                        <input id="submit" name="submit" type="submit" value="Enviar">
+                    </form>
+                </div>
+                
+                </div>
         </div>
         <script type="text/javascript" src="cordova.js"></script>
-        <script type="text/javascript" src="js/index.js"></script>
+        <script type="text/javascript" src="../js/index.js"></script>
+        <script type="text/javascript" src="../js/api/new_divisa.js"></script>
     </body>
 </html>

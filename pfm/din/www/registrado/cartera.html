@@ -31,42 +31,41 @@
         <meta name="format-detection" content="telephone=no">
         <meta name="msapplication-tap-highlight" content="no">
         <meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
-        <link rel="stylesheet" type="text/css" href="css/index.css">
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>           
-        <title>Nuevo registro</title>
+        <link rel="stylesheet" type="text/css" href="../css/index.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+        <title>Cartera de divisas</title>
+        <script src="../lib/Chart.js/dist/Chart.min.js"></script>
+       
+
     </head>
     <body>
-        <div class="app">
-            <h1>Control Horario</h1>
+        <div id="ver_cartera" class="app">
+            <h1>Divisas</h1>
                 <div id="header">
                     <ul class="nav">
-                        <li><a href="index.html">Inicio</a></li>
-                        <li><a href="nuevo_registro.html">Nuevo Registro</a></li>
-                        <li><a href="ver_todos.html">Ver todos los registros</a></li>
+                        <li><a href="dashboard.html">Inicio</a></li>
+                        <li><a href="divisas.html">Divisas</a></li>
+                        <li><a href="cartera.html">Mi cartera</a></li>
+                        <li><a href="calculadora_registrado.html">Conversor</a></li>
+                        <li><a href="biblioteca.html">Biblioteca</a></li>
+                        <li><a href="index.html">Salir</a></li>
                     </ul> 
                 </div>
-                
-                <div id="content">
-                    <b>Nuevo registro</b></p>
-                    <form id="nuevo_registro" method="post">  
-                        <label class="hidden" for="nombre">Nombre :</label>
-                        <input class="hidden"id="name" name="nombre" type="text" value="Patricia"></p>
-                        <label for="dia">Dia :</label>
-                        <input id="dia" name="dia" type="date"></p>
-                        <label for="entrada">Hora de entrada :</label>
-                        <input id="horaEntrada" name="entrada" type="time" min="06:00:00" max="10:00:00"></p>
-                        <label for="salida">Hora de salida :</label>
-                        <input id="horaSalida" name="salida" type="time" min="12:00:00" max="18:00:00"></p>
-                        <label for="laborables">Horas laborables :</label>
-                        <input id="horasLaborables" name="laborables" type="text" value="6:00:00"></p>
-                        <label for="mensaje">Observaciones :</label></p>
-                        <textarea id="Observaciones" name="mensaje" placeholder="Observaciones"></textarea></p>
-                        <input id="submit" name="submit" type="submit" value="Enviar">
-                    </form>
+                <div id="subheader">
+                    <ul class="nav">
+                        <li><a href="nueva_divisa_cartera.html">Añadir nueva criptodivisas a cartera</a></li>
+                    </ul> 
+                </div>
+                <div id="contenido_cartera">
+                    <p>Aquí podrá ver todas las posiciones de su cartera así como la valoración</p>
+                </div>
+              
                 </div>
         </div>
         <script type="text/javascript" src="cordova.js"></script>
-        <script type="text/javascript" src="js/index.js"></script>
-        <script type="text/javascript" src="js/api/nuevo_registro.js"></script>
+        <script type="text/javascript" src="../js/index.js"></script>
+        <script type="text/javascript" src="../js/api/get_divisas.js"></script>
+        <script type="text/javascript" src="../js/api/ver_cartera.js"></script>
+
     </body>
 </html>
