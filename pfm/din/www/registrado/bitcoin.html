@@ -34,8 +34,14 @@
         <meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
         <link rel="stylesheet" type="text/css" href="../css/index.css">
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-        <title>Index</title>
-        
+        <title>Bitcoin</title>
+         <!-- Import TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.0.0/dist/tf.min.js"></script>
+  <!-- Import tfjs-vis -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis@1.0.2/dist/tfjs-vis.umd.min.js"></script>
+
+  <!-- Import the main script file -->
+  <script src="../js/predictor.js"></script>
     </head>
     <body>
         <div id="biblioteca" class="app">
@@ -71,11 +77,17 @@
 <p>La red fue creada por quien o quienes se ocultan tras el seudónimo de Satoshi Nakamoto y posteriormente su desarrollo fue liderado por otros expertos del equipo inicial, denominado Bitcoin Core. Con los años, han ido integrándose nuevos desarrolladores a este proyecto de código abierto, que ahora cuenta con más de 400 colaboradores. Los desarrolladores trabajan diariamente para enfrentar diversos obstáculos e incidentes que moldean la historia de Bitcoin. Actualmente, el principal reto es la escalabilidad (crecimiento) de la red, la cual pasó por la implementación del protocolo SegWit y se encuentra en el desarrollo pleno de Lightning Network y los intercambios atómicos.
 
 <p>Sus exploradores de bloques más conocidos son blockchain.info y blocktrail.com</p>
-
-
+<p>Introduzca un valor para predecir</p>
+                <input type="text" id="lname" name="lname" onchange="prediceValor(this.value)"><br><br>
+                Tiempo estimado: 40 segundos
+                <div id="grafica"></div>
+              <div id="estimacion"></div>
                 </div>
+                
+            
         </div>
         <script type="text/javascript" src="cordova.js"></script>
         <script type="text/javascript" src="js/index.js"></script>
+        
     </body>
 </html>
