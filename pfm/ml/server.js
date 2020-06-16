@@ -25,4 +25,32 @@ routes(app); //register the route
 
 app.listen(port);
 
+let transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "***REMOVED***",
+    pass: "***REMOVED***"
+  }
+});
+cron.schedule("30 1 * * *", function(){
+  console.log("---------------------");  
+  console.log("Entrenando modelo");
+  TaskControllers.entrena();
+    let mailOptions = {
+      from: "***REMOVED***",
+      to: "***REMOVED***",
+      subject: `Entrenamiento de ML actualizado`,
+      text: `Entrenamiento de ML actualizado `
+    };
+    transporter.sendMail(mailOptions, function(error, info) {
+      if (error) {
+        throw error;
+      } else {
+        console.log("Email enviado!");
+      }
+    });
+    console.log("---------------------");
+    console.log("Entrenamiento actualizado");
+});
+
 console.log('Machine Learning Predictor Rest API server started on: ' + port);
