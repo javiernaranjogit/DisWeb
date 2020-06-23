@@ -54,11 +54,12 @@ let transporter = nodemailer.createTransport({
   console.log("Updating Db");
     TaskControllers.updateDbCron();
     NoticiasControllers.updateNoticias();
+    TaskControllers.updateBTCJson();
     let mailOptions = {
       from: "***REMOVED***",
       to: "***REMOVED***",
-      subject: `Base de datos actualizada`,
-      text: `Se ha actualizado la base de datos `
+      subject: "Jarvis actualizado",
+      text: "Actualizado el servidor, db, noticias y cotizaciones",
     };
     transporter.sendMail(mailOptions, function(error, info) {
       if (error) {

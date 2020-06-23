@@ -39,7 +39,7 @@ cron.schedule("30 2 * * *", function(){
     let mailOptions = {
       from: "***REMOVED***",
       to: "***REMOVED***",
-      subject: `Entrenamiento de ML actualizado`,
+      subject: `Friday Actualizado`,
       text: `Entrenamiento de ML actualizado `
     };
     transporter.sendMail(mailOptions, function(error, info) {
