@@ -1,27 +1,29 @@
-var express = require('express'),
-  app = express(),
-  port = process.env.PORT || 3000,
-  mongoose = require('mongoose'),
-  Task = require('./api/models/backendModel'), //created model loading here
-  Auth = require('./api/models/authModel'), //created model loading here
-  jwt = require('jsonwebtoken'),
-  config = require('./config'),
-  bodyParser = require('body-parser');
+'use strict';
+const express = require('express');
+const mongoose = require('mongoose');
 
-// mongoose instance connection url connection
-mongoose.Promise = global.Promise;
-mongoose.connect('mongodb://localhost/backendDB',{useNewUrlParser: true,useUnifiedTopology: true });
+// Los modelos se registran antes que los controladores, que los recuperan
+// mediante mongoose.model(...).
+require('./api/models/backendModel');
+require('./api/models/authModel');
 
+const port = process.env.PORT || 3000;
+const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backendDB';
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
+require('./api/routes/backendRoutes')(app);
 
-var routes = require('./api/routes/backendRoutes'); //importing route
-routes(app); //register the route
+async function main() {
+  await mongoose.connect(mongoUri);
+  app.listen(port, () => {
+    console.log(`backend Rest API server started on: ${port}`);
+  });
+}
 
-
-
-app.listen(port);
-
-console.log('backend Rest API server started on: ' + port);
+main().catch((err) => {
+  console.error('No se pudo arrancar el servicio:', err.message);
+  process.exit(1);
+});

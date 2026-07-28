@@ -1,20 +1,24 @@
 {
   "name": "backend",
-  "version": "1.0.0",
-  "description": "backend of server",
-  "main": "index.js",
+  "version": "1.1.0",
+  "description": "API REST de tareas con autenticación por JWT (práctica de Ingeniería de desarrollo web)",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "author": "jnaranjo",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
-    "nodemon": "^2.0.2"
+    "nodemon": "^3.1.7"
   },
   "dependencies": {
-    "express": "^4.17.1",
-    "jsonwebtoken": "^8.5.1",
-    "mongoose": "^5.9.1"
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.0"
   }
 }
