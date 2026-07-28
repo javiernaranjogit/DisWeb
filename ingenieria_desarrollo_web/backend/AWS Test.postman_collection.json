@@ -90,7 +90,7 @@
 					"urlencoded": [
 						{
 							"key": "token",
-							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjaGVjayI6dHJ1ZSwiaWF0IjoxNTgyNjcwMDA5LCJleHAiOjE1ODI2NzE0NDl9.Wd34G9Z8SY2nZJS-RKEgsNmPxMt7AFljfuK4roWk_H8",
+							"value": "PEGA_AQUI_TU_TOKEN",
 							"type": "text"
 						},
 						{

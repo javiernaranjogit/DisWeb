@@ -4,10 +4,10 @@ include 'La-carta.php';
 $cart = new Cart;
 // Datos del comercio para la pasarela de pago. La clave de firma se lee del
 // entorno: es un secreto y no debe estar escrita en el repositorio.
-$clave       = getenv('TPV_CLAVE')        ?: 'CLAVE_DE_PRUEBAS';
-$merchantID  = getenv('TPV_MERCHANT_ID')  ?: '***REMOVED***';
-$AcquirerBIN = getenv('TPV_ACQUIRER_BIN') ?: '***REMOVED***';
-$TerminalId  = getenv('TPV_TERMINAL_ID')  ?: '00000003';
+$clave       = getenv('TPV_CLAVE')        ?: 'TU_CLAVE_DE_FIRMA';
+$merchantID  = getenv('TPV_MERCHANT_ID')  ?: 'TU_MERCHANT_ID';
+$AcquirerBIN = getenv('TPV_ACQUIRER_BIN') ?: 'TU_ACQUIRER_BIN';
+$TerminalId  = getenv('TPV_TERMINAL_ID')  ?: 'TU_TERMINAL_ID';
 
 $num_operacion = random_int(1, 150);
 $importe       = $cart->total() * 100;
@@ -47,7 +47,7 @@ $firma = strtolower(hash('sha256', $cadenaAFirmar));
         });
     }
     </script>
-    <script src="https://www.paypal.com/sdk/js?client-id=***REMOVED***"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id=<?php echo urlencode(getenv('PAYPAL_CLIENT_ID') ?: 'TU_CLIENT_ID'); ?>"></script>
     <script>
         paypal.Buttons(
                 {style: {
