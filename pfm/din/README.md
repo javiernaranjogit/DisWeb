@@ -45,10 +45,15 @@ Para las notificaciones push hace falta un `google-services.json` propio, descar
 consola de Firebase y colocado en esta carpeta. Está en `.gitignore`; la plantilla es
 [`google-services.example.json`](google-services.example.json).
 
-> **Nota**: el proyecto usa `cordova-android@8`, la versión con la que se desarrolló el TFM.
-> Compilarlo hoy requiere un Android SDK de esa época. Actualizar a `cordova-android@13`
-> implicaría migrar Gradle y AndroidX, y se ha dejado fuera del alcance de la modernización a
-> propósito: no aporta nada al proyecto y sí mucho riesgo de romperlo.
+> **Nota sobre `cordova-android@8`**: es la versión con la que se desarrolló el TFM, y compilar
+> con ella hoy requiere un Android SDK de esa época. Actualizar a `cordova-android@13` implicaría
+> migrar Gradle y AndroidX; se ha dejado fuera del alcance de la modernización a propósito,
+> porque no aporta nada al proyecto y sí mucho riesgo de romperlo.
+>
+> Esa cadena de herramientas arrastra avisos de Dependabot (`shelljs`, `dot-prop`, `uuid`,
+> `brace-expansion`). Son dependencias **de compilación**, no del código que se ejecuta en el
+> dispositivo: la app es HTML y JavaScript dentro de un WebView y no instala nada por npm. Los
+> servicios de backend, que sí se despliegan, tienen `npm audit` limpio.
 
 ## Estructura
 
