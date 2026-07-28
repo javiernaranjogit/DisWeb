@@ -2,19 +2,25 @@
 // initializ shopping cart class
 include 'La-carta.php';
 $cart = new Cart;
-$clave="***REMOVED***";
-$merchantID="***REMOVED***";
-$AcquirerBIN="***REMOVED***";
-$TerminalId="00000003";
-$num_operacion= random_int(1, 150);
-$importe=$cart->total()*100;
-$tipoMoneda=978;
-$cadena="2SHA2";
-$url_ok='http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com/modelos_negocios_web/OrdenExito.php';
-$url_nok='http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com/modelos_negocios_web/VerCarta.php';
+// Datos del comercio para la pasarela de pago. La clave de firma se lee del
+// entorno: es un secreto y no debe estar escrita en el repositorio.
+$clave       = getenv('TPV_CLAVE')        ?: 'CLAVE_DE_PRUEBAS';
+$merchantID  = getenv('TPV_MERCHANT_ID')  ?: '***REMOVED***';
+$AcquirerBIN = getenv('TPV_ACQUIRER_BIN') ?: '***REMOVED***';
+$TerminalId  = getenv('TPV_TERMINAL_ID')  ?: '00000003';
 
-$cadenaAFirmar="***REMOVED******REMOVED******REMOVED***00000003{$num_operacion}{$importe}9782SHA2http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com/modelos_negocios_web/OrdenExito.phphttp://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com/modelos_negocios_web/VerCarta.php";
-$firma= strtolower(hash('sha256', $cadenaAFirmar));
+$num_operacion = random_int(1, 150);
+$importe       = $cart->total() * 100;
+$tipoMoneda    = 978;   // EUR
+$cadena        = "2SHA2";
+
+// Base pública del sitio, para las URLs de retorno de la pasarela.
+$base_url = getenv('APP_BASE_URL') ?: 'http://localhost/modelos_negocios_web';
+$url_ok   = "$base_url/OrdenExito.php";
+$url_nok  = "$base_url/VerCarta.php";
+
+$cadenaAFirmar = "{$clave}{$merchantID}{$AcquirerBIN}{$TerminalId}{$num_operacion}{$importe}{$tipoMoneda}{$cadena}{$url_ok}{$url_nok}";
+$firma = strtolower(hash('sha256', $cadenaAFirmar));
 
 
 ?>
@@ -138,11 +144,11 @@ $firma= strtolower(hash('sha256', $cadenaAFirmar));
             <td><a href="Pagos.php" class="btn btn-success btn-block">Pagos <i class="glyphicon glyphicon-menu-right"></i></a></td>
             <td><div id="button_paypal"></div></td>
             <td><form name="frm_customer_detail" action="https://tpv.ceca.es/tpvweb/tpv/compra.action" method="POST">     
-                    <INPUT NAME="MerchantID" TYPE=hidden VALUE="***REMOVED***">
-<INPUT NAME="AcquirerBIN" TYPE=hidden VALUE="***REMOVED***">
-<INPUT NAME="TerminalID" TYPE=hidden VALUE="00000003">
-<INPUT NAME="URL_OK" TYPE=hidden VALUE="http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com/modelos_negocios_web/OrdenExito.php">
-<INPUT NAME="URL_NOK" TYPE=hidden VALUE="http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com/modelos_negocios_web/VerCarta.php">
+                    <INPUT NAME="MerchantID" TYPE=hidden VALUE="<?php echo $merchantID; ?>">
+<INPUT NAME="AcquirerBIN" TYPE=hidden VALUE="<?php echo $AcquirerBIN; ?>">
+<INPUT NAME="TerminalID" TYPE=hidden VALUE="<?php echo $TerminalId; ?>">
+<INPUT NAME="URL_OK" TYPE=hidden VALUE="<?php echo $url_ok; ?>">
+<INPUT NAME="URL_NOK" TYPE=hidden VALUE="<?php echo $url_nok; ?>">
 <INPUT NAME="Firma" TYPE=hidden VALUE=<?php echo $firma;?>>
 <INPUT NAME="Cifrado" TYPE=hidden VALUE="SHA2">
 <INPUT NAME="Num_operacion" TYPE=hidden VALUE=<?php echo $num_operacion;?>>

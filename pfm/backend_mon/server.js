@@ -1,98 +1,39 @@
-var cors = require('cors');
-let nodemailer = require("nodemailer");
-const cron = require("node-cron");
-/*var session = require('express-session')
-var mongoose = require('mongoose');
-var passport = require('passport');
-var LocalStrategy = require('passport-local').Strategy;
-var async = require('async');
-var crypto = require('crypto');
-*/
-var express = require('express'),
-  app = express(),
-  port = process.env.PORT || 1988,
-  mongoose = require('mongoose'),
-  Task = require('./api/models/backendModel'), //created model loading here
-  TaskControllers = require('./api/controllers/backendController'), //created controllers loading here
-  Users = require('./api/models/usuariosModel'), //created model loading here
-  UsersControllers = require('./api/controllers/backendUsersController'), //created controllers loading here
-  Cartera = require('./api/models/carteraModel'), //created model loading here
-  CarteraControllers = require('./api/controllers/backendCarteraController'), //created controllers loading here
-  Noticias = require('./api/models/newsModel'), //created model loading here
-  NoticiasControllers = require('./api/controllers/backendNoticiasController'), //created controllers loading here
+'use strict';
+const mongoose = require('mongoose');
+const cron = require('node-cron');
 
+const config = require('./config');
+const app = require('./app');
+const registros = require('./api/controllers/backendController');
+const noticias = require('./api/controllers/backendNoticiasController');
+const { notificarAdmin } = require('./api/services/mailer');
 
-  jwt = require('jsonwebtoken'),
-  config = require('./config'),
-  bodyParser = require('body-parser');
+async function main() {
+  await mongoose.connect(config.mongoUri);
+  console.log(`[backend_mon] Conectado a MongoDB (${config.mongoUri})`);
 
+  if (config.enableCron) {
+    // 01:30 — cotizaciones del día y titulares
+    cron.schedule('30 1 * * *', async () => {
+      await registros.updateDbCron();
+      await noticias.updateNoticias();
+      await notificarAdmin('CriptoVisor: datos actualizados', 'Cotizaciones y noticias al día.');
+    });
 
-// mongoose instance connection url connection
-mongoose.Promise = global.Promise;
-mongoose.connect('mongodb://localhost/pfmDB',{useNewUrlParser: true,useUnifiedTopology: true });
-
-app.use(cors());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-
-
-var routes = require('./api/routes/backendRoutes'); //importing route
-routes(app); //register the route
-
-// create mail transporter
-let transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "***REMOVED***",
-    pass: "***REMOVED***"
+    // 03:30 — boletín diario a los usuarios suscritos
+    cron.schedule('30 3 * * *', async () => {
+      await noticias.createDailyNewsletter();
+      await notificarAdmin('CriptoVisor: boletín enviado', 'Boletín diario enviado.');
+    });
+    console.log('[backend_mon] Tareas programadas activas');
   }
+
+  app.listen(config.port, () => {
+    console.log(`[backend_mon] API REST escuchando en el puerto ${config.port}`);
+  });
+}
+
+main().catch((err) => {
+  console.error('[backend_mon] No se pudo arrancar el servicio:', err.message);
+  process.exit(1);
 });
-
-//  // run the function 00:00:00 hour 
- cron.schedule("30 1 * * *", function(){
-  console.log("---------------------");  
-  console.log("Updating Db");
-    TaskControllers.updateDbCron();
-    NoticiasControllers.updateNoticias();
-    //TaskControllers.updateBTCJson();
-    let mailOptions = {
-      from: "***REMOVED***",
-      to: "***REMOVED***",
-      subject: "Jarvis actualizado",
-      text: "Actualizado el servidor, db, noticias y cotizaciones",
-    };
-    transporter.sendMail(mailOptions, function(error, info) {
-      if (error) {
-        throw error;
-      } else {
-        console.log("Email enviado!");
-      }
-    });
-    console.log("---------------------");
-    console.log("Db updated");
-});
-
-cron.schedule("30 3 * * *", function(){
-  console.log("---------------------");  
-  console.log("Loading Newsletter");
-  NoticiasControllers.createDailyNewsletter();
-    let mailOptions = {
-      from: "***REMOVED***",
-      to: "***REMOVED***",
-      subject: `Newsletter enviada`,
-      text: `Se ha actualizado la base de datos `
-    };
-    transporter.sendMail(mailOptions, function(error, info) {
-      if (error) {
-        throw error;
-      } else {
-        console.log("Email enviado!");
-      }
-    });
-    console.log("---------------------");
-    console.log("Newsletter enviada updated");
-});
-
-app.listen(port);
-
-console.log('backend Rest API server started on: ' + port);

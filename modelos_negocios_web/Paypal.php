@@ -2,12 +2,13 @@
 // 1. Autoload the SDK Package. This will include all the files and classes to your autoloader
 require __DIR__  . '/project/autoload.php';
 
-// 2. Provide your Secret Key. Replace the given one with your app clientId, and Secret
+// 2. Credenciales de la aplicación de PayPal. Se leen del entorno:
+// exporta PAYPAL_CLIENT_ID y PAYPAL_CLIENT_SECRET antes de arrancar el servidor.
 // https://developer.paypal.com/webapps/developer/applications/myapps
 $apiContext = new \PayPal\Rest\ApiContext(
     new \PayPal\Auth\OAuthTokenCredential(
-        '***REMOVED***',     // ClientID
-        '***REMOVED***'      // ClientSecret
+        getenv('PAYPAL_CLIENT_ID')     ?: 'TU_CLIENT_ID',
+        getenv('PAYPAL_CLIENT_SECRET') ?: 'TU_CLIENT_SECRET'
     )
 );
 

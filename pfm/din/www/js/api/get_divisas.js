@@ -21,7 +21,7 @@ $( "#divisas_form" ).submit(function( event ) {
   
   
     console.log(data.origen);
-    var url_get ="http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/buscarPorFechaFiltrando/";
+    var url_get =AppConfig.API_BASE + "/buscarPorFechaFiltrando/";
     console.log(data.dia_inicio);
     if(data.dia_inicio == "" || data.dia_fin ==""){
       alert("No puede estar las fechas vacías, compruebe");
@@ -49,7 +49,7 @@ $( "#divisas_form" ).submit(function( event ) {
         console.log(data_origen_get);
         var data_recibida = data;
         $.ajax({
-          url: "http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/estimar/",
+          url: AppConfig.API_BASE + "/estimar/",
           type: 'post',
           timeout: 10000, 
           dataType: 'json',

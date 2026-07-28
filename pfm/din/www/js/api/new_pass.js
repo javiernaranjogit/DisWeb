@@ -20,7 +20,7 @@ $( "#new_pass" ).submit(function( event ) {
     });
   }
   console.log(token);
-  var url_get ="http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/reset/"+token;
+  var url_get =AppConfig.API_BASE + "/reset/"+token;
   
     if(data.password != data.rep_password){
       alert('Las contraseñas no coinciden.');

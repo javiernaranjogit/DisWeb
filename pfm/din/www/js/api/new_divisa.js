@@ -10,16 +10,11 @@ $( "#nuevo_registro" ).submit(function( event ) {
   $inputs.each(function() {
       data[this.id] = $(this).val();
     });
-  var usernameLogin = window.localStorage.getItem('usernameLogin');
-  var token = window.localStorage.getItem('userToken');
-  var string_rate = data.origen+":"+data.cantidad;
-  var data_send={};
-  data_send["username"]=usernameLogin;
-  data_send["rates"]=string_rate;
-  data_send["token"]=token;
+  var data_send = { rates: data.origen + ":" + data.cantidad };
       $.ajax({
-        url: "http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/addToCartera/",
+        url: AppConfig.API_BASE + "/addToCartera",
         type: 'post',
+        headers: Auth.headers(),
         data: data_send,
         dataType: 'JSON',
         error: function(XMLHttpRequest, textStatus, errorThrown) {

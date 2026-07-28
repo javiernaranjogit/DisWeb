@@ -1,274 +1,198 @@
-var request = require('request');
-const tf = require('@tensorflow/tfjs');
+'use strict';
 const fs = require('fs');
-var csv = require('csv-string');
+const path = require('path');
+const axios = require('axios');
+const csv = require('csv-string');
+const tf = require('@tensorflow/tfjs');
+const mongoose = require('mongoose');
 
-var mongoose = require('mongoose'),
-  config = require('../../config'),
-  Registros = mongoose.model('Registros');
-  NubePuntos = mongoose.model('NubePuntos');
+const config = require('../../config');
 
-  exports.deleteAllNoticias = function(req, res) {
-    Registros.deleteMany({}, function(err, task) {
-      if (err)
-        res.send(err);
-      res.json({ message: 'All registros successfully deleted' });
-    });
-  };
+const Registros = mongoose.model('Registros');
+const NubePuntos = mongoose.model('NubePuntos');
 
-  exports.list_all = function(req, res) {
-    Registros.find({}, function(err, task) {
-      if (err)
-        res.send(err);
-      res.json(task);
-    });
-  };
+const RUTA_COTIZACIONES = path.join(__dirname, '..', '..', 'data', 'cotizaciones.json');
 
-  exports.list_all_nube = function(req, res) {
-    NubePuntos.find({}, function(err, task) {
-      if (err)
-        res.send(err);
-      res.json(task);
-    }).sort({_id: -1}).limit(1);
-  };
-exports.entrena = async function(req, res) {
-    var data = getData();
-    const model = tf.sequential(); 
-    
-    // Add a single input layer
-    model.add(tf.layers.dense({inputShape: [1], units: 1, useBias: true}));
-    model.add(tf.layers.dense({units: 50, activation: 'sigmoid'}));
-    
-    // Add an output layer
-    model.add(tf.layers.dense({units: 1, useBias: true}));
-    const tensorData = convertToTensor(data);
-    const {inputs, labels} = tensorData;
-    console.log("Comenzamos a entrenar el modelo");
-    await trainModel(model, inputs, labels);
-    console.log("Entrenamiento realizado");
-    testModel(model, data, tensorData);  
-    almacenaVariables(model, tensorData,res);  
-  };
-
-  exports.estimacion = function(req, res) {
-     var value = req.body.value;
-     Registros.find({}, function(err,registro){
-      var pendiente = registro[0].pendiente;
-      var nplus = registro[0].nplus;
-      valor_estimado = (pendiente*value)+nplus;
-      res.json(valor_estimado);
-    }).sort({_id: -1}).limit(1);
-  };
-
-function getData() {
-  const fs = require('fs');
-  let global_data = fs.readFileSync("cotizaciones.json");
-  let data_semi = JSON.parse(global_data);
-  const cleaned = data_semi.map(value => ({
-    open: value.Open,
-    close: value.Close,
-  }));  
-  return cleaned;
+/** Lee el histórico cacheado y se queda con los pares (apertura, cierre). */
+function cargarDatos() {
+  const contenido = fs.readFileSync(RUTA_COTIZACIONES, 'utf-8');
+  return JSON.parse(contenido)
+    .map((fila) => ({ open: parseFloat(fila.Open), close: parseFloat(fila.Close) }))
+    .filter((fila) => Number.isFinite(fila.open) && Number.isFinite(fila.close));
 }
 
-function convertToTensor(data) {
-  // Wrapping these calculations in a tidy will dispose any 
-  // intermediate tensors.
-  
+/** Baraja los datos, los pasa a tensores y los normaliza al rango 0-1. */
+function convertirATensores(datos) {
   return tf.tidy(() => {
-    // Step 1. Shuffle the data    
-    tf.util.shuffle(data);
+    tf.util.shuffle(datos);
 
-    // Step 2. Convert data to Tensor
-    const inputs = data.map(d => d.open)
-    const labels = data.map(d => d.close);
+    const inputTensor = tf.tensor2d(datos.map((d) => d.open), [datos.length, 1]);
+    const labelTensor = tf.tensor2d(datos.map((d) => d.close), [datos.length, 1]);
 
-    const inputTensor = tf.tensor2d(inputs, [inputs.length, 1]);
-    const labelTensor = tf.tensor2d(labels, [labels.length, 1]);
-
-    //Step 3. Normalize the data to the range 0 - 1 using min-max scaling
     const inputMax = inputTensor.max();
-    const inputMin = inputTensor.min();  
+    const inputMin = inputTensor.min();
     const labelMax = labelTensor.max();
     const labelMin = labelTensor.min();
 
-    const normalizedInputs = inputTensor.sub(inputMin).div(inputMax.sub(inputMin));
-    const normalizedLabels = labelTensor.sub(labelMin).div(labelMax.sub(labelMin));
-
     return {
-      inputs: normalizedInputs,
-      labels: normalizedLabels,
-      // Return the min/max bounds so we can use them later.
+      inputs: inputTensor.sub(inputMin).div(inputMax.sub(inputMin)),
+      labels: labelTensor.sub(labelMin).div(labelMax.sub(labelMin)),
       inputMax,
       inputMin,
       labelMax,
       labelMin,
-    }
-  });  
+    };
+  });
 }
 
-async function trainModel(model, inputs, labels) {
-  // Prepare the model for training.  
+/** Red densa sencilla: 1 entrada -> 50 neuronas sigmoide -> 1 salida. */
+function crearModelo() {
+  const model = tf.sequential();
+  model.add(tf.layers.dense({ inputShape: [1], units: 1, useBias: true }));
+  model.add(tf.layers.dense({ units: 50, activation: 'sigmoid' }));
+  model.add(tf.layers.dense({ units: 1, useBias: true }));
+  return model;
+}
+
+async function entrenarModelo(model, inputs, labels) {
   model.compile({
     optimizer: tf.train.adam(),
     loss: tf.losses.meanSquaredError,
     metrics: ['mse'],
   });
-  
-  const batchSize = 45;
-  const epochs = 140;
-  return await model.fit(inputs, labels, {
-    batchSize,
-    epochs,
+  return model.fit(inputs, labels, {
+    batchSize: config.entrenamiento.batchSize,
+    epochs: config.entrenamiento.epochs,
     shuffle: true,
   });
 }
 
-function testModel(model, inputData, normalizationData) {
-  const {inputMax, inputMin, labelMin, labelMax} = normalizationData;  
-  
-  // Generate predictions for a uniform range of numbers between 0 and 1;
-  // We un-normalize the data by doing the inverse of the min-max scaling 
-  // that we did earlier.
+/**
+ * Genera 100 predicciones sobre el rango completo, las desnormaliza y guarda la
+ * nube de puntos (real vs. predicho) para poder pintarla en el cliente.
+ */
+async function guardarNubePuntos(model, datos, normalizacion) {
+  const { inputMax, inputMin, labelMin, labelMax } = normalizacion;
   const [xs, preds] = tf.tidy(() => {
-    
-    const xs = tf.linspace(0, 1, 100);    
-    const preds = model.predict(xs.reshape([100, 1]));      
-    
-    const unNormXs = xs
-      .mul(inputMax.sub(inputMin))
-      .add(inputMin);
-      
-    const unNormPreds = preds
-      .mul(labelMax.sub(labelMin))
-      .add(labelMin);
-    
-    // Un-normalize the data
-    return [unNormXs.dataSync(), unNormPreds.dataSync()];
+    const entrada = tf.linspace(0, 1, 100);
+    const salida = model.predict(entrada.reshape([100, 1]));
+    return [
+      entrada.mul(inputMax.sub(inputMin)).add(inputMin).dataSync(),
+      salida.mul(labelMax.sub(labelMin)).add(labelMin).dataSync(),
+    ];
   });
-  
- 
-  const predictedPoints = Array.from(xs).map((val, i) => {
-    return {x: val, y: preds[i]}
+
+  await NubePuntos.create({
+    timestamp: new Date(),
+    originalPoints: datos.map((d) => ({ x: d.open, y: d.close })),
+    predictedPoints: Array.from(xs).map((x, i) => ({ x, y: preds[i] })),
   });
-  
-  const originalPoints = inputData.map(d => ({
-    x: d.open, y: d.close,
-  }));
-  var data={};
-  data.originalPoints=originalPoints;
-  data.predictedPoints = predictedPoints;
-  var new_task = new NubePuntos(data);
-  new_task.save(function(err, news) {
-    if (err)
-      console.log("Error actualizando nube de puntos");
-    console.log(news);
-  });
-  // habría que enviar a cliente para que lo pinten -> originalPoints, predictedPoints
 }
 
-function almacenaVariables(model, normalizationData,res) {
-  const {inputMax, inputMin, labelMin, labelMax} = normalizationData;  
-  
-  const [xs, preds] = tf.tidy(() => {
-    
-    const xs = tf.linspace(0, 1, 100);    
-    const preds = model.predict(xs.reshape([100, 1]));      
-    
-    const unNormXs = xs
-      .mul(inputMax.sub(inputMin))
-      .add(inputMin);
-      
-    const unNormPreds = preds
-      .mul(labelMax.sub(labelMin))
-      .add(labelMin);
-    
+/**
+ * Resume el modelo en la recta y = pendiente·x + nplus, que es lo que consulta
+ * el endpoint de estimación (así no hay que recargar la red en cada petición).
+ */
+async function guardarParametrosRecta(normalizacion) {
+  const { inputMax, inputMin, labelMin, labelMax } = normalizacion;
+  const [pendiente, nplus] = tf.tidy(() => {
     const pend = inputMax.sub(inputMin).div(labelMax.sub(labelMin));
-    const nplus = labelMax.sub(inputMax.sub(pend));
-    console.log("Pendiente y nplus");
-    var pendiente_recta = pend.toString();
-    var nplus_valor = nplus.toString();
-    console.log(pendiente_recta);
-    console.log(nplus_valor);
-    var data =[];
-    data["pendiente"]=parseFloat(limpiarString(pendiente_recta));
-    data["nplus"]=parseFloat(limpiarString(nplus_valor));
-    data["timestamp"] = new Date();
-    console.log(data);
-    var new_task = new Registros(data);
-    new_task.save(function(err, news) {
-      if (err)
-        console.log("Error actualizando entrenamientos");
-      console.log(news);
-    });
-    return [pendiente_recta,nplus_valor]
+    return [pend.dataSync()[0], labelMax.sub(inputMax.sub(pend)).dataSync()[0]];
   });
 
-
+  await Registros.create({ timestamp: new Date(), pendiente, nplus });
+  console.log(`[ml] Parámetros guardados: pendiente=${pendiente}, nplus=${nplus}`);
+  return { pendiente, nplus };
 }
 
-function limpiarString(value){
-  const regex = /\d+.\d+/g;
-      let m;
-      let string_publicar;
-      while ((m = regex.exec(value)) !== null) {
-          // This is necessary to avoid infinite loops with zero-width matches
-          if (m.index === regex.lastIndex) {
-              regex.lastIndex++;
-          }
-          // The result can be accessed through the `m`-variable.
-          m.forEach((match, groupIndex) => {
-              console.log(`Found match, group ${groupIndex}: ${match}`);
-              string_publicar= match;
-          });
-      }
-  return string_publicar;
+/** Entrena el modelo y persiste sus resultados. Usado por la ruta y por el cron. */
+exports.entrena = async function (req, res) {
+  try {
+    const datos = cargarDatos();
+    const normalizacion = convertirATensores(datos);
+    const model = crearModelo();
 
-}
+    console.log(`[ml] Entrenando con ${datos.length} muestras...`);
+    await entrenarModelo(model, normalizacion.inputs, normalizacion.labels);
+    console.log('[ml] Entrenamiento terminado');
 
-exports.updateBTCJson = function(req, res) {
-  var request = require('request');
-  var hasta = Math.round(+new Date()/1000);
-  var d = new Date();
-  d.setDate(d.getDate() - 1000);
-  var desde = Math.round(+d/1000);
-  console.log(desde);
-  var url_get="https://query1.finance.yahoo.com/v7/finance/download/BTC-EUR?interval=1d&events=history"+"&period1="+desde+"&period2="+hasta;
+    await guardarNubePuntos(model, datos, normalizacion);
+    const parametros = await guardarParametrosRecta(normalizacion);
 
-  var options = {
-    'method': 'GET',
-    'url': url_get,
-  };
-  request(options, function (error, response) { 
-    if (error){
-      throw new Error(error)
-    }
-    var server_string = response.body; 
-    const arr = csv.parse(server_string);
-    const str = csv.stringify(arr);
-    var lines=str.split("\n");
-    var result = [];
-    var headers=lines[0].split(",");
-
-    for(var i=1;i<lines.length;i++){
-
-      var obj = {};
-      var currentline=lines[i].split(",");
-
-      for(var j=0;j<headers.length;j++){
-          obj[headers[j]] = currentline[j];
-      }
-
-      result.push(obj);
-
+    if (res) res.json({ message: 'Modelo entrenado', ...parametros });
+    return parametros;
+  } catch (err) {
+    console.error('[ml] Error entrenando el modelo:', err.message);
+    if (res) res.status(500).json({ message: 'No se pudo entrenar el modelo' });
+    return null;
   }
-  var json_string= JSON.stringify(result);
-  var route_file="cotizaciones.json";
-  fs.writeFile(route_file, json_string, function (err) {
-    if (err) throw err;
-    console.log('File is created successfully.');
-  }); 
-    console.log('Updated data');
-  });
+};
 
+exports.list_all = async function (req, res) {
+  try {
+    res.json(await Registros.find({}).lean());
+  } catch (err) {
+    console.error('[ml] Error listando entrenamientos:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
+};
+
+exports.list_all_nube = async function (req, res) {
+  try {
+    res.json(await NubePuntos.find({}).sort({ _id: -1 }).limit(1).lean());
+  } catch (err) {
+    console.error('[ml] Error listando la nube de puntos:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
+};
+
+exports.deleteAllData = async function (req, res) {
+  try {
+    await Promise.all([Registros.deleteMany({}), NubePuntos.deleteMany({})]);
+    res.json({ message: 'All registros successfully deleted' });
+  } catch (err) {
+    console.error('[ml] Error borrando datos:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
+};
+
+/** Estima el precio de cierre a partir del último entrenamiento almacenado. */
+exports.estimacion = async function (req, res) {
+  const valor = Number(req.body.value);
+  if (!Number.isFinite(valor)) {
+    return res.status(400).json({ message: 'El campo value debe ser numérico' });
+  }
+  try {
+    const ultimo = await Registros.findOne({}).sort({ _id: -1 }).lean();
+    if (!ultimo) {
+      return res.status(404).json({ message: 'Todavía no hay ningún modelo entrenado' });
+    }
+    res.json(ultimo.pendiente * valor + ultimo.nplus);
+  } catch (err) {
+    console.error('[ml] Error calculando la estimación:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
+};
+
+/** Refresca el histórico diario de BTC usado como conjunto de entrenamiento. */
+exports.updateBTCJson = async function (req, res) {
+  const hasta = Math.round(Date.now() / 1000);
+  const desde = hasta - 1000 * 24 * 60 * 60;
+  const url =
+    'https://query1.finance.yahoo.com/v7/finance/download/BTC-EUR' +
+    `?interval=1d&events=history&period1=${desde}&period2=${hasta}`;
+  try {
+    const { data } = await axios.get(url, { timeout: 20000, responseType: 'text' });
+    const filas = csv.parse(data);
+    const cabeceras = filas[0];
+    const registros = filas.slice(1).map((fila) =>
+      Object.fromEntries(cabeceras.map((cabecera, i) => [cabecera, fila[i]]))
+    );
+    fs.writeFileSync(RUTA_COTIZACIONES, JSON.stringify(registros));
+    console.log(`[ml] Histórico actualizado (${registros.length} filas)`);
+    if (res) res.json({ message: 'Histórico actualizado', registros: registros.length });
+  } catch (err) {
+    console.error('[ml] Error actualizando el histórico:', err.message);
+    if (res) res.status(502).json({ message: 'No se pudo descargar el histórico' });
+  }
 };

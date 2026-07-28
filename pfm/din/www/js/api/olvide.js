@@ -6,7 +6,7 @@ $( "#olvide" ).submit(function( event ) {
       data[this.id] = $(this).val();
   });
   console.log(data);
-    var url_get ="http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/forgot";
+    var url_get =AppConfig.API_BASE + "/forgot";
     $.ajax({
       url: url_get,
       type: 'post',

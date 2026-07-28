@@ -1,17 +1,15 @@
 {
-  "name": "helloworld",
-  "displayName": "HelloCordova",
+  "name": "criptovisor-app",
+  "displayName": "CriptoVisor",
   "version": "1.0.0",
-  "description": "A sample Apache Cordova application that responds to the deviceready event.",
+  "description": "App híbrida Cordova de CriptoVisor: cotizaciones, cartera, noticias y estimación de precios",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "keywords": [
-    "ecosystem:cordova"
+    "ecosystem:cordova",
+    "cordova-android"
   ],
-  "author": "Apache Cordova Team",
-  "license": "Apache-2.0",
+  "author": "Javier Naranjo",
+  "license": "MIT",
   "dependencies": {
     "chart.js": "^2.9.3",
     "cordova-android": "^8.1.0",

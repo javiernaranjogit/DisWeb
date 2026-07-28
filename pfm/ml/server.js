@@ -1,57 +1,32 @@
-var cors = require('cors');
-let nodemailer = require("nodemailer");
-const cron = require("node-cron");
+'use strict';
+const mongoose = require('mongoose');
+const cron = require('node-cron');
 
-var express = require('express'),
-  app = express(),
-  port = process.env.PORT || 1994,
-  mongoose = require('mongoose'),
-  Task = require('./api/models/backendModel'), //created model loading here
-  Nube = require('./api/models/backendModelPoints'), //created model loading here
-  TaskControllers = require('./api/controllers/backendController'), 
-  config = require('./config'),
-  bodyParser = require('body-parser');
+const config = require('./config');
+const app = require('./app');
+const modelo = require('./api/controllers/backendController');
+const { notificarAdmin } = require('./api/services/mailer');
 
-  app.use(cors());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+async function main() {
+  await mongoose.connect(config.mongoUri);
+  console.log(`[ml] Conectado a MongoDB (${config.mongoUri})`);
 
-// mongoose instance connection url connection
-mongoose.Promise = global.Promise;
-mongoose.connect('mongodb://localhost/pfmDB',{useNewUrlParser: true,useUnifiedTopology: true });
-
-var routes = require('./api/routes/backendRoutes'); //importing route
-routes(app); //register the route
-
-app.listen(port);
-
-let transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "***REMOVED***",
-    pass: "***REMOVED***"
-  }
-});
-cron.schedule("30 2 * * *", function(){
-  console.log("---------------------");  
-  console.log("Entrenando modelo");
-  TaskControllers.updateBTCJson();
-  TaskControllers.entrena();
-    let mailOptions = {
-      from: "***REMOVED***",
-      to: "***REMOVED***",
-      subject: `Friday Actualizado`,
-      text: `Entrenamiento de ML actualizado `
-    };
-    transporter.sendMail(mailOptions, function(error, info) {
-      if (error) {
-        throw error;
-      } else {
-        console.log("Email enviado!");
-      }
+  if (config.enableCron) {
+    // 02:30 — se refresca el histórico y se reentrena el modelo
+    cron.schedule('30 2 * * *', async () => {
+      await modelo.updateBTCJson();
+      await modelo.entrena();
+      await notificarAdmin('CriptoVisor: modelo reentrenado', 'Entrenamiento nocturno completado.');
     });
-    console.log("---------------------");
-    console.log("Entrenamiento actualizado");
-});
+    console.log('[ml] Reentrenamiento programado activo');
+  }
 
-console.log('Machine Learning Predictor Rest API server started on: ' + port);
+  app.listen(config.port, () => {
+    console.log(`[ml] API de predicción escuchando en el puerto ${config.port}`);
+  });
+}
+
+main().catch((err) => {
+  console.error('[ml] No se pudo arrancar el servicio:', err.message);
+  process.exit(1);
+});

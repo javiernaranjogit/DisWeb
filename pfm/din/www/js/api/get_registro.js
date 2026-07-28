@@ -12,7 +12,7 @@ $( "#calculadora" ).submit(function( event ) {
   if(data.cantidad ==""){
       alert("Cantidad vacía, por favor rellene");
   }else{
-    var url_get ="http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/convertirEuros/" +data.origen+"/"+data.cantidad;
+    var url_get =AppConfig.API_BASE + "/convertirEuros/" +data.origen+"/"+data.cantidad;
     $.ajax({
       url: url_get,
       type: 'post',

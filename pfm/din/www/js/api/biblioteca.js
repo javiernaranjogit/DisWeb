@@ -7,7 +7,7 @@ $(document).on({
 
 $("#biblioteca").ready(function( event ) {
     $.ajax({
-        url: "http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/getLatestBlockData",
+        url: AppConfig.API_BASE + "/getLatestBlockData",
         type: 'get',
         timeout: 10000, 
         dataType: 'json',        

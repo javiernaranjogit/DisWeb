@@ -1,0 +1,25 @@
+{
+  "_comentario": "Plantilla. El google-services.json real lo genera la consola de Firebase para tu propio proyecto y NO se sube al repositorio (está en .gitignore). Descárgalo y colócalo junto a este fichero antes de compilar el APK.",
+  "project_info": {
+    "project_number": "TU_PROJECT_NUMBER",
+    "firebase_url": "https://TU_PROYECTO.firebaseio.com",
+    "project_id": "TU_PROYECTO",
+    "storage_bucket": "TU_PROYECTO.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "TU_APP_ID",
+        "android_client_info": {
+          "package_name": "com.criptovisor.app"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "TU_API_KEY"
+        }
+      ]
+    }
+  ],
+  "configuration_version": "1"
+}

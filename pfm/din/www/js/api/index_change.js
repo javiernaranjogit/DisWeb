@@ -1,6 +1,6 @@
 $("#dashboard").ready(function( event ) {
   $.ajax({
-      url: "http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/getMetricasGlobales",
+      url: AppConfig.API_BASE + "/getMetricasGlobales",
       type: 'get',
       timeout: 5000, 
       dataType: 'json',        
@@ -35,7 +35,7 @@ $("#dashboard").ready(function( event ) {
     var nombre_usuario = window.localStorage.getItem('userName');
     document.getElementById("nombre_usuario").innerHTML = "<b>" + nombre_usuario + "</b>";
     $.ajax({
-        url: "http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/getLatestNews",
+        url: AppConfig.API_BASE + "/getLatestNews",
         type: 'get',
         timeout: 5000, 
         dataType: 'json',        

@@ -15,7 +15,7 @@ $( "#nuevo_registro" ).submit(function( event ) {
       }
     });
         $.ajax({
-          url: "http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:3000/nuevoregistro/",
+          url: AppConfig.API_BASE + "/nuevoregistro/",
           type: 'post',
           data: data,
           dataType: 'JSON',

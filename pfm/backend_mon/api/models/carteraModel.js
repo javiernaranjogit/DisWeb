@@ -1,14 +1,12 @@
 'use strict';
-var mongoose = require('mongoose');
-var Schema = mongoose.Schema;
-var carteraSchema = new Schema({
-  username: {
-    type: String
-  },
-  rates:{
-  }
+const mongoose = require('mongoose');
 
-  
+const { Schema } = mongoose;
+
+// Una cartera por usuario. `rates` es un objeto libre {divisa: cantidad}.
+const carteraSchema = new Schema({
+  username: { type: String, unique: true, index: true },
+  rates: {},
 });
 
 module.exports = mongoose.model('Cartera', carteraSchema);

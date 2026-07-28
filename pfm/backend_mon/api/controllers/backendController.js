@@ -1,566 +1,343 @@
 'use strict';
-const _ = require('lodash');
 const fs = require('fs');
-const brain = require('brain.js');
-const assert = require('assert');
-var parse = require('csv-parse');
-var async = require('async');
-var csv = require('csv-string');
+const path = require('path');
+const axios = require('axios');
+const csv = require('csv-string');
+const mongoose = require('mongoose');
 
-const { hasData } = require('jquery');
-var mongoose = require('mongoose'),
-  jwt = require('jsonwebtoken'),
-  config = require('../../config'),
-  Registros = mongoose.model('Registros');
+const config = require('../../config');
 
-exports.list_all_registros = function(req, res) {
-  Registros.find({}, function(err, task) {
-    if (err)
-      res.send(err);
-    res.json(task);
-  });
-};
+const Registros = mongoose.model('Registros');
 
+const RUTA_CSV_BTC = path.join(__dirname, '..', '..', 'data', 'BTC-EUR.csv');
+const RUTA_COTIZACIONES = path.join(__dirname, '..', '..', 'data', 'cotizaciones.json');
 
-exports.updateDb = function(req, res) {
-  var request = require('request');
-  var options = {
-    'method': 'GET',
-    'url': 'http://api.coinlayer.com/live?access_key=***REMOVED***&target=EUR',
-    'headers': {
-    }
-  };
-  
-  var data = request(options, function (error, response) { 
-    if (error) throw new Error(error);
-    var data= JSON.parse(response.body);
-    var date = new Date(data.timestamp * 1000);
-    data.timestamp = date;
-    delete data['success'];
-    delete data['terms'];
-    delete data['privacy'];
-    console.log(data);
-    var new_task = new Registros(data);
-    new_task.save(function(err, task) {
-      if (err)
-        res.send(err);
-      res.json(task);
-    });
-  });
-  
-};
-
-exports.updateDbCron = function() {
-  var request = require('request');
-  var options = {
-    'method': 'GET',
-    'url': 'http://api.coinlayer.com/live?access_key=***REMOVED***&target=EUR',
-    'headers': {
-    }
-  };
-  
-  var data = request(options, function (error, response) { 
-    if (error) throw new Error(error);
-    var data= JSON.parse(response.body);
-    var date = new Date(data.timestamp * 1000);
-    data.timestamp = date;
-    data.currency="EUR";
-    delete data['success'];
-    delete data['terms'];
-    delete data['privacy'];
-    console.log(data);
-    var new_task = new Registros(data);
-    new_task.save(function(err, task) {
-      if (err)
-        console.log("Error updating db");
-      console.log(task);
-    });
-  });
-  
-};
-
-exports.add_registro = function(req, res) {
-  var data = req.body;
-  var date = new Date(data.timestamp * 1000);
-  data.timestamp = date;
-  var rates = data.rates;
-  var mydatas= JSON.parse(rates);
-  data.rates=mydatas;
-  console.log(data);
-
-  var new_task = new Registros(data);
-  new_task.save(function(err, task) {
-    if (err)
-      res.send(err);
-    res.json(task);
-  });
-};
-
-
-exports.update_registro = function(req, res) {
-  //
-};
-
-exports.buscarPorFecha = function(req, res) {
-  var fecha_desde = req.params.fecha_inicio;
-  var fecha_hasta = req.params.fecha_fin;
-  Registros.find({timestamp:{
-    $gte: fecha_desde,
-    $lte: fecha_hasta
-  }}, function(err, task) {
-    if (err)
-      res.send(err);
-    res.json(task);
-  });
-};
-exports.buscarPorFechaFiltrando = function(req, res) {
-  var fecha_desde = req.body.fecha_inicio;
-  var fecha_hasta = req.body.fecha_fin;
-  var rates = req.body.currencies;
-  Registros.find({timestamp:{
-    $gte: fecha_desde,
-    $lte: fecha_hasta
+/** Descarga las cotizaciones del día desde coinlayer y las normaliza. */
+async function obtenerCotizaciones() {
+  if (!config.coinlayerApiKey) {
+    throw new Error('COINLAYER_API_KEY no configurada');
   }
-}, function(err, tasks) {
-    var data = JSON.stringify(tasks);
-    var data_json = JSON.parse(data);
-    var keys = Object.keys(data_json);
-    var result=[];
-    for(var i=0;i<=keys.length-1;i++){
-      var sub_json = data_json[i];
-      var hijo={};
-      hijo._id=sub_json._id;
-      hijo.timestamp=sub_json.timestamp;
-      hijo.currency=sub_json.currency;
-      var keys_rates = Object.keys(sub_json.rates);
-      var array_input_rates = rates.split(',');
-      hijo.rates=[];
-      for(var j=0;j<=keys_rates.length-1;j++){
-        for(var k=0; k<=array_input_rates.length-1;k++){
-            if(keys_rates[j].localeCompare(array_input_rates[k])==0){
-              var value_rate=sub_json.rates[keys_rates[j]];
-              var name_rate = keys_rates[j];
-              var sub_rate={};
-              sub_rate[name_rate]=value_rate;
-              hijo.rates.push(sub_rate);
-            }
-        }
-      }
-      console.log(hijo);
-      result.push(hijo);
-    }
-    res.json(result);
-  }).sort({_id: -1})
-  .limit(10);
-};
-
-exports.convertirMonedas = function(req, res) {
-  var divisaOrigen = req.params.divisaOrigen;
-  var divisaDestino = req.params.divisaDestino;
-  var cantidad = req.params.cantidad;
-
-  Registros.findOne({}, {}, { sort: { 'created_at' : -1 } }, function(err, task) {
-    console.log(task);
-    var keys = Object.keys(task.rates);
-    let cot_divisa_destino=0;
-    let cot_divisa_origen=0;
-    //Get the currency of last inputs of rates
-    keys.forEach(element => {
-      if(element == divisaDestino){
-          cot_divisa_destino = task.rates[divisaDestino];
-        }
-    }); 
-    keys.forEach(element => {
-      if(element == divisaOrigen){
-        cot_divisa_origen = task.rates[divisaOrigen];
-        }
-    }); 
-      //maths 
-    var total_origen = cantidad * cot_divisa_origen;
-    var total_destino = total_origen/cot_divisa_destino;
-    var data = {};
-    data.divisaOrigen=divisaOrigen;
-    data.divisaDestino=divisaDestino;
-    data.cantidad = cantidad;
-    data.conversion= total_destino;
-    res.json(data);
-    });
-};
-
-exports.convertirEuros = function(req, res) {
-  var divisaOrigen = req.params.divisaOrigen;
-  var cantidad = req.params.cantidad;
-
-  Registros.findOne({}, {}, { sort: { 'created_at' : -1 } }, function(err, task) {
-    console.log(task);
-    var keys = Object.keys(task.rates);
-    let cot_divisa_destino=0;
-    let cot_divisa_origen=0;
-    keys.forEach(element => {
-      if(element == divisaOrigen){
-        cot_divisa_origen = task.rates[divisaOrigen];
-        }
-    }); 
-      //maths 
-    var total_origen = cantidad * cot_divisa_origen;
-    var data = {};
-    data.divisaOrigen=divisaOrigen;
-    data.divisaDestino="EUR";
-    data.cantidad = cantidad;
-    data.conversion= total_origen;
-    res.json(data);
-    });
-};
-
-
-exports.deleteregistro = function(req, res) {
-  Registros.deleteOne({
-    _id: req.params.registroId
-  }, function(err, task) {
-    if (err)
-      res.send(err);
-    res.json({ message: 'Register successfully deleted'});
+  const { data } = await axios.get('https://api.coinlayer.com/live', {
+    params: { access_key: config.coinlayerApiKey, target: 'EUR' },
+    timeout: 10000,
   });
+  return {
+    timestamp: new Date(data.timestamp * 1000),
+    currency: 'EUR',
+    rates: data.rates,
+  };
+}
+
+exports.list_all_registros = async function (req, res) {
+  try {
+    res.json(await Registros.find({}).lean());
+  } catch (err) {
+    console.error('[registros] Error listando:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
 };
 
-exports.deleteAll = function(req, res) {
-  Registros.deleteMany({}, function(err, task) {
-    if (err)
-      res.send(err);
+exports.updateDb = async function (req, res) {
+  try {
+    const registro = await Registros.create(await obtenerCotizaciones());
+    res.json(registro);
+  } catch (err) {
+    console.error('[registros] Error actualizando cotizaciones:', err.message);
+    res.status(502).json({ message: 'No se pudieron obtener las cotizaciones' });
+  }
+};
+
+/** Misma actualización, invocada desde la tarea programada (sin respuesta HTTP). */
+exports.updateDbCron = async function () {
+  try {
+    await Registros.create(await obtenerCotizaciones());
+    console.log('[cron] Cotizaciones actualizadas');
+  } catch (err) {
+    console.error('[cron] Error actualizando cotizaciones:', err.message);
+  }
+};
+
+exports.add_registro = async function (req, res) {
+  try {
+    const data = { ...req.body };
+    data.timestamp = new Date(data.timestamp * 1000);
+    if (typeof data.rates === 'string') {
+      data.rates = JSON.parse(data.rates);
+    }
+    res.status(201).json(await Registros.create(data));
+  } catch (err) {
+    console.error('[registros] Error creando registro:', err.message);
+    res.status(400).json({ message: 'Datos no válidos' });
+  }
+};
+
+exports.buscarPorFecha = async function (req, res) {
+  try {
+    const registros = await Registros.find({
+      timestamp: { $gte: req.params.fecha_inicio, $lte: req.params.fecha_fin },
+    }).lean();
+    res.json(registros);
+  } catch (err) {
+    console.error('[registros] Error buscando por fecha:', err.message);
+    res.status(400).json({ message: 'Fechas no válidas' });
+  }
+};
+
+/** Igual que la anterior, pero devolviendo sólo las divisas solicitadas. */
+exports.buscarPorFechaFiltrando = async function (req, res) {
+  const { fecha_inicio, fecha_fin, currencies } = req.body;
+  if (!currencies) {
+    return res.status(400).json({ message: 'Falta el parámetro currencies' });
+  }
+  try {
+    const divisas = currencies.split(',');
+    const registros = await Registros.find({
+      timestamp: { $gte: fecha_inicio, $lte: fecha_fin },
+    })
+      .sort({ _id: -1 })
+      .limit(10)
+      .lean();
+
+    const resultado = registros.map((registro) => ({
+      _id: registro._id,
+      timestamp: registro.timestamp,
+      currency: registro.currency,
+      rates: divisas
+        .filter((divisa) => registro.rates && registro.rates[divisa] !== undefined)
+        .map((divisa) => ({ [divisa]: registro.rates[divisa] })),
+    }));
+    res.json(resultado);
+  } catch (err) {
+    console.error('[registros] Error filtrando por fecha:', err.message);
+    res.status(400).json({ message: 'Parámetros no válidos' });
+  }
+};
+
+/** Devuelve la última cotización registrada. */
+async function ultimoRegistro() {
+  return Registros.findOne({}).sort({ _id: -1 }).lean();
+}
+
+exports.convertirMonedas = async function (req, res) {
+  const { divisaOrigen, divisaDestino, cantidad } = req.params;
+  try {
+    const registro = await ultimoRegistro();
+    if (!registro || !registro.rates) {
+      return res.status(404).json({ message: 'No hay cotizaciones disponibles' });
+    }
+    const tasaOrigen = Number(registro.rates[divisaOrigen]) || 0;
+    const tasaDestino = Number(registro.rates[divisaDestino]) || 0;
+    if (!tasaDestino) {
+      return res.status(400).json({ message: 'Divisa de destino desconocida' });
+    }
+    res.json({
+      divisaOrigen,
+      divisaDestino,
+      cantidad,
+      conversion: (Number(cantidad) * tasaOrigen) / tasaDestino,
+    });
+  } catch (err) {
+    console.error('[registros] Error convirtiendo monedas:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
+};
+
+exports.convertirEuros = async function (req, res) {
+  const { divisaOrigen, cantidad } = req.params;
+  try {
+    const registro = await ultimoRegistro();
+    if (!registro || !registro.rates) {
+      return res.status(404).json({ message: 'No hay cotizaciones disponibles' });
+    }
+    const tasaOrigen = Number(registro.rates[divisaOrigen]) || 0;
+    res.json({
+      divisaOrigen,
+      divisaDestino: 'EUR',
+      cantidad,
+      conversion: Number(cantidad) * tasaOrigen,
+    });
+  } catch (err) {
+    console.error('[registros] Error convirtiendo a euros:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
+};
+
+exports.deleteregistro = async function (req, res) {
+  try {
+    const resultado = await Registros.deleteOne({ _id: req.params.registroId });
+    if (resultado.deletedCount === 0) {
+      return res.status(404).json({ message: 'Registro no encontrado' });
+    }
+    res.json({ message: 'Register successfully deleted' });
+  } catch (err) {
+    console.error('[registros] Error borrando registro:', err.message);
+    res.status(400).json({ message: 'Identificador no válido' });
+  }
+};
+
+exports.deleteAll = async function (req, res) {
+  try {
+    await Registros.deleteMany({});
     res.json({ message: 'All registers successfully deleted' });
-  });
-};
-
-exports.getMetricasGlobales = function(req, res) {
-  var request = require('request');
-  var options = {
-    'method': 'GET',
-    'url': 'https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest?convert=EUR',
-    'headers': {
-      'X-CMC_PRO_API_KEY': '***REMOVED***',
-      'Cookie': '__cfduid=d641c82dd4ad973c89493688532d38bd11591220278'
-    }
-  };
-  request(options, function (error, response) { 
-    if (error){
-      throw new Error(error)
-    }
-    var data= JSON.parse(response.body);
-    console.log(data);
-    console.log(data.data.quote);
-    res.json(data);
-  });
-  
-};
-
-exports.getLatestBlockData = function(req, res) {
-  var request = require('request');
-  var options = {
-    'method': 'GET',
-    'url': 'https://blockchain.info/latestblock',
-  };
-  request(options, function (error, response) { 
-    if (error){
-      throw new Error(error)
-    }
-    var data= JSON.parse(response.body);
-    var hash_last=data.hash;
-    var url_data = "https://blockchain.info/rawblock/"+hash_last;
-    var options = {
-      'method': 'GET',
-      'url': url_data,
-    };
-    request(options, function (error, response) { 
-      if (error){
-        throw new Error(error)
-      }
-      var data= JSON.parse(response.body);
-      delete data['tx'];
-      console.log(data);
-      res.json(data);
-    });
-  });
-  
-};
-
-exports.getStats = function(req, res) {
-  var request = require('request');
-  var options = {
-    'method': 'GET',
-    'url': 'https://api.blockchain.info/stats',
-  };
-  request(options, function (error, response) { 
-    if (error){
-      throw new Error(error)
-    }
-    var data= JSON.parse(response.body);
-    res.json(data);
-    
-  });
-  
-};
-
-exports.estimar = function(req, res) {
-  var rates = req.body.currency;
-  Registros.find({}
-, async function(err, tasks) {
-    var data = JSON.stringify(tasks);
-    var data_json = JSON.parse(data);
-    var keys = Object.keys(data_json);
-    var result=[];
-    var index_result=0;
-    for(var i=0;i<=keys.length-1;i++){
-      var sub_json = data_json[i];
-      var hijo={};
-      var keys_rates = Object.keys(sub_json.rates);
-      var array_input_rates = rates.split(',');
-      hijo.rates=[];
-      for(var j=0;j<=keys_rates.length-1;j++){
-        for(var k=0; k<=array_input_rates.length-1;k++){
-            if(keys_rates[j].localeCompare(array_input_rates[k])==0){
-              var value_rate=sub_json.rates[keys_rates[j]];
-              result[index_result]=parseFloat(value_rate);  
-              index_result +=1;
-            }
-        }
-      }
-      //console.log(result);
-            
-
-    }
-    
-// // provide optional config object, defaults shown.
-
-// const net = new brain.NeuralNetwork();
-// net.train([
-//   { input: { precio:1000 }, output: { compra: 1 } },
-//   { input: { precio:2000 }, output: { compra: 1 } },
-//   { input: { precio:3000 }, output: { compra: 1 } },
-//   { input: { precio:8000 }, output: { compra: 1 } },
-//   { input: { precio:9000 }, output: { venta: 1 } },
-//   { input: { precio:20000 }, output: { venta: 1 } },
-//   { input: { precio:121000 }, output: { venta: 1 } },
-// ]);
-// var ultimo_dato = result[0];
-// const output = net.run({ precio:ultimo_dato });
-// var data_enviar={};
-// data_enviar["ultimo_valor"]=ultimo_dato;
-// data_enviar["evaluacion"]=output;
-var inputFile='BTC-EUR.csv';
-    // read contents of the file
-    const entrada_texto = fs.readFileSync(inputFile, 'UTF-8');
-    // split the contents by new line
-    const lines = entrada_texto.split(/\r?\n/);
-    // print all lines
-    var index=0;
-    var cotizaciones_pasadas=[];
-    var volumen_mercado =[];
-    var apertura =[];
-    var highVal=[];
-    var lowVal =[];
-    var j=0;
-    lines.forEach((line) => {
-        //console.log(line);
-        if(index!=0){
-        var datos = line.split(',');
-        if(datos[6] !=undefined){
-          cotizaciones_pasadas[j] =parseFloat(datos[5]);
-          volumen_mercado[j]=parseFloat(datos[6]);
-          apertura[j]=parseFloat(datos[1]);
-          highVal[j]=parseFloat(datos[2]);
-          lowVal[j]=parseFloat(datos[3]);
-          j +=1;
-          }
-        }
-        index +=1;
-    });
-    var data_test_input =[];
-    var trainingData =[];
-    var traingDataEstimacion =[];
-    for (var j=0;j<=cotizaciones_pasadas.length-1;j++){
-      var data_fila={};
-      var index_volumen = j-1;
-      var cot_pas=cotizaciones_pasadas[j];
-      var volum_dia =volumen_mercado[j];
-      trainingData[j]=Math.round(cot_pas);
-      traingDataEstimacion[j]=[Math.round(apertura[j]),Math.round(highVal[j]),Math.round(lowVal[j]),Math.round(cotizaciones_pasadas[j]),Math.round(volumen_mercado[j])]
-      if(j==0){
-        index_volumen =0;
-      }
-      var accion_realizada;
-      var string_accion;
-      var volum_anterior = volumen_mercado[index_volumen];
-      //si ese dia ha habido mas volumen de mercado que el anterior, ha habido mas VENTAS =1
-      if(volum_anterior <volum_dia){
-        accion_realizada=1;
-        string_accion ="venta";
-      }else{
-        accion_realizada=1;
-        string_accion ="compra";
-      }
-      data_fila["input"] = {cotizacion:cot_pas};
-      var object = {};
-      object[string_accion] = 1;
-      data_fila["output"] = object;
-      data_test_input[j]=data_fila;
-    }
-    const net = new brain.NeuralNetwork();
-    var trainingData1=[];
-    var index_max =trainingData.length/12;
-    net.train(data_test_input);
-    var ultimo_dato = result[0];
-    const output = net.run({cotizacion:ultimo_dato}); 
-    var data_enviar={};
-    data_enviar["ultimo_valor"]=ultimo_dato;
-    data_enviar["evaluacion"]=output;
-res.json(data_enviar);  
-}).sort({_id: -1}).limit(1);
-};
-
-exports.sandbox = function(req, res) {
-  var rates = "BTC";
-  Registros.find({}
-, async function(err, tasks) {
-    var data = JSON.stringify(tasks);
-    var data_json = JSON.parse(data);
-    var keys = Object.keys(data_json);
-    var result=[];
-    var index_result=0;
-    for(var i=0;i<=keys.length-1;i++){
-      var sub_json = data_json[i];
-      var hijo={};
-      var keys_rates = Object.keys(sub_json.rates);
-      var array_input_rates = rates.split(',');
-      hijo.rates=[];
-      for(var j=0;j<=keys_rates.length-1;j++){
-        for(var k=0; k<=array_input_rates.length-1;k++){
-            if(keys_rates[j].localeCompare(array_input_rates[k])==0){
-              var value_rate=sub_json.rates[keys_rates[j]];
-              result[index_result]=parseFloat(value_rate);  
-              index_result +=1;
-            }
-        }
-      }
+  } catch (err) {
+    console.error('[registros] Error borrando registros:', err.message);
+    res.status(500).json({ message: 'Error interno' });
   }
-  var inputFile='BTC-EUR.csv';
-    // read contents of the file
-    const entrada_texto = fs.readFileSync(inputFile, 'UTF-8');
-    // split the contents by new line
-    const lines = entrada_texto.split(/\r?\n/);
-    // print all lines
-    var index=0;
-    var cotizaciones_pasadas=[];
-    var volumen_mercado =[];
-    var apertura =[];
-    var highVal=[];
-    var lowVal =[];
-    var j=0;
-    lines.forEach((line) => {
-        //console.log(line);
-        if(index!=0){
-        var datos = line.split(',');
-        if(datos[6] !=undefined){
-          cotizaciones_pasadas[j] =parseFloat(datos[5]);
-          volumen_mercado[j]=parseFloat(datos[6]);
-          apertura[j]=parseFloat(datos[1]);
-          highVal[j]=parseFloat(datos[2]);
-          lowVal[j]=parseFloat(datos[3]);
-          j +=1;
-          }
-        }
-        index +=1;
-    });
-    var data_test_input =[];
-    var trainingData =[];
-    var traingDataEstimacion =[];
-    for (var j=0;j<=cotizaciones_pasadas.length-1;j++){
-      var data_fila={};
-      var index_volumen = j-1;
-      var cot_pas=cotizaciones_pasadas[j];
-      var volum_dia =volumen_mercado[j];
-      trainingData[j]=Math.round(cot_pas);
-      traingDataEstimacion[j]=[Math.round(apertura[j]),Math.round(highVal[j]),Math.round(lowVal[j]),Math.round(cotizaciones_pasadas[j]),Math.round(volumen_mercado[j])]
-      if(j==0){
-        index_volumen =0;
-      }
-      var accion_realizada;
-      var string_accion;
-      var volum_anterior = volumen_mercado[index_volumen];
-      //si ese dia ha habido mas volumen de mercado que el anterior, ha habido mas VENTAS =1
-      if(volum_anterior <volum_dia){
-        accion_realizada=1;
-        string_accion ="venta";
-      }else{
-        accion_realizada=1;
-        string_accion ="compra";
-      }
-      data_fila["input"] = {cotizacion:cot_pas};
-      var object = {};
-      object[string_accion] = 1;
-      data_fila["output"] = object;
-      data_test_input[j]=data_fila;
-    }
-    const net = new brain.NeuralNetwork();
-    var trainingData1=[];
-    var index_max =trainingData.length/12;
-    net.train(data_test_input);
-    var ultimo_dato = result[0];
-    const output = net.run({cotizacion:ultimo_dato}); 
-    var data_enviar={};
-    data_enviar["ultimo_valor"]=ultimo_dato;
-    data_enviar["evaluacion"]=output;
-    //Red Neuronal de prevision y calculo
-
-
-
-
-    res.json(data_enviar);  
-  }).sort({_id: -1}).limit(1);
 };
 
-exports.updateBTCJson = function(req, res) {
-  var request = require('request');
-  var hasta = Math.round(+new Date()/1000);
-  var d = new Date();
-  d.setDate(d.getDate() - 1000);
-  var desde = Math.round(+d/1000);
-  console.log(desde);
-  var url_get="https://query1.finance.yahoo.com/v7/finance/download/BTC-EUR?interval=1d&events=history"+"&period1="+desde+"&period2="+hasta;
-
-  var options = {
-    'method': 'GET',
-    'url': url_get,
-  };
-  request(options, function (error, response) { 
-    if (error){
-      throw new Error(error)
-    }
-    var server_string = response.body; 
-    const arr = csv.parse(server_string);
-    const str = csv.stringify(arr);
-    var lines=str.split("\n");
-    var result = [];
-    var headers=lines[0].split(",");
-
-    for(var i=1;i<lines.length;i++){
-
-      var obj = {};
-      var currentline=lines[i].split(",");
-
-      for(var j=0;j<headers.length;j++){
-          obj[headers[j]] = currentline[j];
-      }
-
-      result.push(obj);
-
+exports.getMetricasGlobales = async function (req, res) {
+  if (!config.cmcApiKey) {
+    return res.status(503).json({ message: 'CMC_API_KEY no configurada' });
   }
-  var json_string= JSON.stringify(result);
-  var route_file="cotizaciones.json";
-  fs.writeFile(route_file, json_string, function (err) {
-    if (err) throw err;
-    console.log('File is created successfully.');
-  }); 
-    console.log('Updated data');
-  });
+  try {
+    const { data } = await axios.get(
+      'https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest',
+      {
+        params: { convert: 'EUR' },
+        headers: { 'X-CMC_PRO_API_KEY': config.cmcApiKey },
+        timeout: 10000,
+      }
+    );
+    res.json(data);
+  } catch (err) {
+    console.error('[metricas] Error consultando CoinMarketCap:', err.message);
+    res.status(502).json({ message: 'No se pudieron obtener las métricas globales' });
+  }
+};
 
+exports.getLatestBlockData = async function (req, res) {
+  try {
+    const { data: ultimo } = await axios.get('https://blockchain.info/latestblock', {
+      timeout: 10000,
+    });
+    const { data: bloque } = await axios.get(
+      `https://blockchain.info/rawblock/${ultimo.hash}`,
+      { timeout: 15000 }
+    );
+    delete bloque.tx; // la lista de transacciones es enorme y no se usa
+    res.json(bloque);
+  } catch (err) {
+    console.error('[blockchain] Error consultando el último bloque:', err.message);
+    res.status(502).json({ message: 'No se pudo consultar la cadena de bloques' });
+  }
+};
+
+exports.getStats = async function (req, res) {
+  try {
+    const { data } = await axios.get('https://api.blockchain.info/stats', { timeout: 10000 });
+    res.json(data);
+  } catch (err) {
+    console.error('[blockchain] Error consultando estadísticas:', err.message);
+    res.status(502).json({ message: 'No se pudieron obtener las estadísticas' });
+  }
+};
+
+/**
+ * Lee el histórico de BTC del CSV y lo etiqueta: un día con más volumen que el
+ * anterior se interpreta como presión vendedora (1), y en caso contrario como
+ * compradora (0). Es el mismo criterio del trabajo original.
+ */
+function cargarEjemplosHistoricos() {
+  const contenido = fs.readFileSync(RUTA_CSV_BTC, 'utf-8');
+  const lineas = contenido.split(/\r?\n/).slice(1); // se descarta la cabecera
+  const precios = [];
+  const etiquetas = [];
+  let volumenAnterior = null;
+
+  lineas.forEach((linea) => {
+    const campos = linea.split(',');
+    if (campos.length < 7) return;
+    const cierre = parseFloat(campos[4]);
+    const volumen = parseFloat(campos[6]);
+    if (!Number.isFinite(cierre) || !Number.isFinite(volumen)) return;
+    precios.push(cierre);
+    etiquetas.push(volumenAnterior !== null && volumenAnterior < volumen ? 1 : 0);
+    volumenAnterior = volumen;
+  });
+  return { precios, etiquetas };
+}
+
+// El modelo se entrena una sola vez y se reutiliza entre peticiones: antes se
+// reentrenaba la red entera en cada llamada al endpoint.
+let clasificador = null;
+
+async function obtenerClasificador() {
+  if (clasificador) return clasificador;
+
+  const tf = require('@tensorflow/tfjs');
+  const { precios, etiquetas } = cargarEjemplosHistoricos();
+  const min = Math.min(...precios);
+  const max = Math.max(...precios);
+  const normalizar = (valor) => (max > min ? (valor - min) / (max - min) : 0);
+
+  const model = tf.sequential();
+  model.add(tf.layers.dense({ inputShape: [1], units: 8, activation: 'relu' }));
+  model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
+  model.compile({ optimizer: tf.train.adam(), loss: 'binaryCrossentropy' });
+
+  const xs = tf.tensor2d(precios.map(normalizar), [precios.length, 1]);
+  const ys = tf.tensor2d(etiquetas, [etiquetas.length, 1]);
+  await model.fit(xs, ys, { epochs: 30, batchSize: 32, shuffle: true });
+  xs.dispose();
+  ys.dispose();
+
+  clasificador = { model, normalizar, tf };
+  return clasificador;
+}
+
+/**
+ * Estimación compra/venta sobre el histórico de BTC. La red original usaba
+ * brain.js, abandonada desde 2020 y con una cadena de dependencias nativas
+ * vulnerable; se ha reescrito con TensorFlow.js, que ya usa el servicio `ml`.
+ * La predicción de precio propiamente dicha sigue viviendo en ese servicio.
+ */
+exports.estimar = async function (req, res) {
+  const divisas = (req.body.currency || 'BTC').split(',');
+  try {
+    const registro = await ultimoRegistro();
+    if (!registro || !registro.rates) {
+      return res.status(404).json({ message: 'No hay cotizaciones disponibles' });
+    }
+    const divisa = divisas.find((d) => registro.rates[d] !== undefined);
+    if (!divisa) {
+      return res.status(400).json({ message: 'Divisa no disponible en el último registro' });
+    }
+    const ultimoValor = parseFloat(registro.rates[divisa]);
+
+    const { model, normalizar, tf } = await obtenerClasificador();
+    const entrada = tf.tensor2d([normalizar(ultimoValor)], [1, 1]);
+    const probabilidadVenta = model.predict(entrada).dataSync()[0];
+    entrada.dispose();
+
+    res.json({
+      ultimo_valor: ultimoValor,
+      evaluacion: { venta: probabilidadVenta, compra: 1 - probabilidadVenta },
+    });
+  } catch (err) {
+    console.error('[estimar] Error generando la estimación:', err.message);
+    res.status(500).json({ message: 'No se pudo generar la estimación' });
+  }
+};
+
+/** Descarga el histórico diario de BTC y lo deja cacheado en data/cotizaciones.json. */
+exports.updateBTCJson = async function (req, res) {
+  const hasta = Math.round(Date.now() / 1000);
+  const desde = hasta - 1000 * 24 * 60 * 60;
+  const url =
+    'https://query1.finance.yahoo.com/v7/finance/download/BTC-EUR' +
+    `?interval=1d&events=history&period1=${desde}&period2=${hasta}`;
+  try {
+    const { data } = await axios.get(url, { timeout: 20000, responseType: 'text' });
+    const filas = csv.parse(data);
+    const cabeceras = filas[0];
+    const registros = filas.slice(1).map((fila) =>
+      Object.fromEntries(cabeceras.map((cabecera, i) => [cabecera, fila[i]]))
+    );
+    fs.writeFileSync(RUTA_COTIZACIONES, JSON.stringify(registros));
+    console.log('[btc] Histórico actualizado');
+    if (res) res.json({ message: 'Histórico actualizado', registros: registros.length });
+  } catch (err) {
+    console.error('[btc] Error actualizando el histórico:', err.message);
+    if (res) res.status(502).json({ message: 'No se pudo descargar el histórico' });
+  }
 };

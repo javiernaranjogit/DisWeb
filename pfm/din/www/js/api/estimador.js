@@ -14,7 +14,7 @@ $( "#estimador_form" ).submit(function( event ) {
   });
   console.log(data)
   
-    var url_get ="http://ec2-15-236-90-96.eu-west-3.compute.amazonaws.com:1994/estimacion";
+    var url_get =AppConfig.ML_BASE + "/estimacion";
     if(data.value == ""){
       alert("No puede estar el cierre vacías, compruebe");
     }else{
@@ -37,7 +37,7 @@ $( "#estimador_form" ).submit(function( event ) {
         var cadena_estimador = "El valor predecido es: " +data.toFixed(2)+ " €";
         document.getElementById("estimacion").innerHTML=cadena_estimador;
         $.ajax({
-            url: "http://ec2-15-236-90-96.eu-west-3.compute.amazonaws.com:1994/allNubePuntos",
+            url: AppConfig.ML_BASE + "/allNubePuntos",
             type: 'get',
             timeout: 10000, 
             dataType: 'json',

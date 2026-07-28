@@ -8,17 +8,14 @@ $( "#ver_cartera" ).ready(function( event ) {
   var nombre_usuario = window.localStorage.getItem('userName');
   document.getElementById("nombre_usuario").innerHTML = "<b>" + nombre_usuario + "</b>";
 
-    var data_sender={};
     var index_elementos=0;
-    var username = window.localStorage.getItem('usernameLogin');
-    var token = window.localStorage.getItem('userToken');
-    data_sender["username"]=username;
-    data_sender["token"]=token;
     $body.addClass("loading");
     $.ajax({
-        url: "http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/getCartera/",
+        // El propietario de la cartera lo determina el servidor a partir del
+        // token; ya no se envía el nombre de usuario desde el cliente.
+        url: AppConfig.API_BASE + "/getCartera",
         type: 'post',
-        data: data_sender,
+        headers: Auth.headers(),
         dataType: 'JSON',
         error: function(XMLHttpRequest, textStatus, errorThrown) {
           alert('Error al crear el registro, reinténtelo más tarde');
@@ -32,7 +29,7 @@ $( "#ver_cartera" ).ready(function( event ) {
          for(var i=0;i<=keys.length-1;i++){
              var currency = keys[i];
              var value = rates[keys[i]];
-             var url_get = "http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/convertirEuros/"+currency+"/"+value;
+             var url_get = AppConfig.API_BASE + "/convertirEuros/"+currency+"/"+value;
              console.log(url_get);
              $.ajax({
                 url: url_get,
@@ -65,7 +62,7 @@ $( "#ver_cartera" ).ready(function( event ) {
                 data_fin_fecha = yyyy +"-"+mm+"-"+dd;
                 console.log(data_convertida.divisaOrigen);
                  $.ajax({
-                    url: "http://ec2-35-180-234-37.eu-west-3.compute.amazonaws.com:1988/buscarPorFechaFiltrando/",
+                    url: AppConfig.API_BASE + "/buscarPorFechaFiltrando/",
                     type: 'post',
                     timeout: 10000, 
                     dataType: 'json',

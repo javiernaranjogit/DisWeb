@@ -1,20 +1,14 @@
 'use strict';
-var mongoose = require('mongoose');
-var Schema = mongoose.Schema;
-const Any = new Schema({
-  any: {
-    type: { String: Number }
-  } // "any" will be Mixed - everything inside is ignored.
-});
-var RegistroSchema = new Schema({
-  timestamp: {
-    type: Date
-  },
-  currency:{
-    type: String
-  },
-  rates:{
-  }
+const mongoose = require('mongoose');
+
+const { Schema } = mongoose;
+
+// Cotización diaria. `rates` es un objeto libre {divisa: valor}, tal y como lo
+// devuelve la API de coinlayer, así que no se declara su forma.
+const RegistroSchema = new Schema({
+  timestamp: { type: Date },
+  currency: { type: String },
+  rates: {},
 });
 
 module.exports = mongoose.model('Registros', RegistroSchema);

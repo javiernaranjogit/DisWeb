@@ -1,117 +1,68 @@
 'use strict';
-const _ = require('lodash');
+const mongoose = require('mongoose');
 
-var mongoose = require('mongoose'),
-  jwt = require('jsonwebtoken'),
-  config = require('../../config'),
-  Usuario = mongoose.model('Usuarios'),
-  Cartera = mongoose.model('Cartera');
+const Cartera = mongoose.model('Cartera');
 
-exports.list_all_cartera = function(req, res) {
-  Cartera.find({}, function(err, task) {
-    if (err)
-      res.send(err);
-    res.json(task);
-  });
+/** Listado completo de carteras (sólo administradores). */
+exports.list_all_cartera = async function (req, res) {
+  try {
+    res.json(await Cartera.find({}).lean());
+  } catch (err) {
+    console.error('[cartera] Error listando carteras:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
 };
 
-//Mejorar, no añade sobre el mismo elemento, sino que crea uno nuevo
-exports.addToCartera = function(req, res) {
-  var data = req.body;
-  var token = data.token;
-  var user = data.username;
-  let rates = data.rates;
-  var rates_div = rates.split(":");
-  var rate = rates_div[0];
-  var cantidad = rates_div[1];
-  var data_q={};
-  data_q[rate]=cantidad;
-  if(token) {
-    jwt.verify(token, config.TOKEN_SECRET, (err, decoded) => {
-      if (err) {
-        return res.json({ mensaje: 'Token inválida' });
-      } else {
-        const filter = { username: user };
-        console.log(filter);
-        mongoose.set('useFindAndModify', false);
-        Cartera.find(filter,function(err, result) {
-          //si no existe devuelve []
-          if(result.length==0){
-            var data_new={};
-            data_new["username"] = user;
-            data_new["rates"]=data_q;
-            var new_task = new Cartera(data_new);
-            new_task.save(function(err, task) {
-              if (err){
-              res.send(err);
-              }  
-              res.json(task);
-            });
-          }else{
-            //obtengo todas las divisas del usuario
-            var rates_new = result[0].rates;  // aqui tengo lo de DB
-            var entrado=false;
-            var keys_rates = Object.keys(rates_new);
-            for(var i=0;i<=keys_rates.length-1;i++){
-              if(keys_rates[i]==rate){
-                //cantidad_old no esta referenciado al de la DB -- FALLO A ARREGLAR
-                var cantidad_old = result[0].rates[rate];
-                var total = parseInt(cantidad_old) + parseInt(cantidad);
-                rates_new[keys_rates[i]]=total; 
-                entrado = true;
-              }else{
-                //la moneda no existe, se crea y se actualiza
-                if(!keys_rates.includes(rate)){
-                rates_new[rate]=parseInt(cantidad);
-              }
-              }
-            }
-            const filter = { username: user };
-            const update = { rates: rates_new };
-            console.log(update);
-            Cartera.findOneAndUpdate(filter,update,function(err, respon) {
-              if (err)
-                res.send(err);
-              res.json(respon);
-            });
-          }
-         
-        });
-}
-})
-};
+/**
+ * Añade una cantidad de una divisa a la cartera del usuario autenticado.
+ * El propietario sale del token (`req.user`), no del cuerpo de la petición:
+ * antes bastaba cualquier token válido para operar sobre la cartera ajena.
+ */
+exports.addToCartera = async function (req, res) {
+  const username = req.user.username;
+  const [divisa, cantidadTexto] = String(req.body.rates || '').split(':');
+  const cantidad = Number(cantidadTexto);
+  if (!divisa || !Number.isFinite(cantidad)) {
+    return res.status(400).json({ message: 'Formato esperado: DIVISA:cantidad' });
+  }
+  try {
+    const cartera = await Cartera.findOne({ username });
+    if (!cartera) {
+      const creada = await Cartera.create({ username, rates: { [divisa]: cantidad } });
+      return res.status(201).json(creada);
+    }
+    // `rates` es un campo libre del esquema: hay que reasignarlo y marcarlo
+    // como modificado para que mongoose persista el cambio.
+    const rates = { ...(cartera.rates || {}) };
+    rates[divisa] = (Number(rates[divisa]) || 0) + cantidad;
+    cartera.rates = rates;
+    cartera.markModified('rates');
+    await cartera.save();
+    res.json(cartera);
+  } catch (err) {
+    console.error('[cartera] Error actualizando la cartera:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
 };
 
-exports.deleteAllCartera = function(req, res) {
-  Cartera.deleteMany({}, function(err, task) {
-    if (err)
-      res.send(err);
+exports.deleteAllCartera = async function (req, res) {
+  try {
+    await Cartera.deleteMany({});
     res.json({ message: 'All cartera successfully deleted' });
-  });
+  } catch (err) {
+    console.error('[cartera] Error borrando carteras:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
 };
 
-//unificar todos los datos en uno por moneda
-exports.getCartera = function(req, res) {
-  var data = req.body;
-  var token = data.token;
-  var user = data.username;
-  if(token) {
-    jwt.verify(token, config.TOKEN_SECRET, (err, decoded) => {
-      if (err) {
-        return res.json({ mensaje: 'Token inválida' });
-      } else {
-  Cartera.find({username:user}, function(_err, registros,response=res) {
-    var data_salida={};  
-      if(registros.length!=0){
-       console.log(registros);
-       data_salida = registros[0].rates;
-      }
-      console.log(data_salida);
-       res.send({
-            usernameLogin: user,
-            rates: data_salida
-          });
-        });
-      }})
-    }};
-    
+/** Devuelve la cartera del usuario autenticado. */
+exports.getCartera = async function (req, res) {
+  const username = req.user.username;
+  try {
+    const cartera = await Cartera.findOne({ username }).lean();
+    res.json({ usernameLogin: username, rates: (cartera && cartera.rates) || {} });
+  } catch (err) {
+    console.error('[cartera] Error consultando la cartera:', err.message);
+    res.status(500).json({ message: 'Error interno' });
+  }
+};
